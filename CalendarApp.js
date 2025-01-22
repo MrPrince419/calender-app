@@ -1,115 +1,245 @@
-import { useState } from 'react'
-import { Button } from "/components/ui/button"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "/components/ui/dialog"
-import { Input } from "/components/ui/input"
-import { Label } from "/components/ui/label"
-import { CalendarIcon } from "lucide-react"
-import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay } from 'date-fns'
-import './styles.css'
+document.addEventListener('DOMContentLoaded', () => {
+    // State
+    let currentDate = new Date();
+    let selectedDate = null;
+    let events = loadEvents();
 
-export default function CalendarApp() {
-  const [currentMonth, setCurrentMonth] = useState(new Date())
-  const [events, setEvents] = useState<{ date: Date, title: string, description: string }[]>([])
-  const [modalOpen, setModalOpen] = useState(false)
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null)
-  const [eventTitle, setEventTitle] = useState('')
-  const [eventDescription, setEventDescription] = useState('')
+    // DOM Elements
+    const calendar = document.getElementById('calendar');
+    const monthDisplay = document.getElementById('monthDisplay');
+    const yearDisplay = document.getElementById('yearDisplay');
+    const prevMonthBtn = document.getElementById('prevMonth');
+    const nextMonthBtn = document.getElementById('nextMonth');
+    const prevYearBtn = document.getElementById('prevYear');
+    const nextYearBtn = document.getElementById('nextYear');
+    const eventTitleInput = document.getElementById('eventTitleInput');
+    const eventTimeInput = document.getElementById('eventTimeInput');
+    const eventDescriptionInput = document.getElementById('eventDescriptionInput');
+    const saveButton = document.getElementById('saveButton');
+    const cancelButton = document.getElementById('cancelButton');
+    const eventsList = document.getElementById('eventsList');
+    const notification = document.getElementById('notification');
 
-  const daysInMonth = eachDayOfInterval({
-    start: startOfMonth(currentMonth),
-    end: endOfMonth(currentMonth)
-  })
+    // Event Listeners
+    prevMonthBtn.addEventListener('click', () => {
+        currentDate.setMonth(currentDate.getMonth() - 1);
+        updateCalendar();
+    });
 
-  const handlePrevMonth = () => setCurrentMonth(subMonths(currentMonth, 1))
-  const handleNextMonth = () => setCurrentMonth(addMonths(currentMonth, 1))
+    nextMonthBtn.addEventListener('click', () => {
+        currentDate.setMonth(currentDate.getMonth() + 1);
+        updateCalendar();
+    });
 
-  const handleAddEvent = () => {
-    if (eventTitle.trim() === '') return
-    setEvents([...events, { date: selectedDate!, title: eventTitle, description: eventDescription }])
-    setModalOpen(false)
-    setSelectedDate(null)
-    setEventTitle('')
-    setEventDescription('')
-  }
+    prevYearBtn.addEventListener('click', () => {
+        currentDate.setFullYear(currentDate.getFullYear() - 1);
+        updateCalendar();
+    });
 
-  const handleDeleteEvent = (eventDate: Date, eventTitle: string) => {
-    setEvents(events.filter(event => !isSameDay(event.date, eventDate) || event.title !== eventTitle))
-  }
+    nextYearBtn.addEventListener('click', () => {
+        currentDate.setFullYear(currentDate.getFullYear() + 1);
+        updateCalendar();
+    });
 
-  return (
-    <div className="p-8">
-      <div className="flex justify-between items-center mb-4">
-        <Button variant="outline" onClick={handlePrevMonth}>
-          <CalendarIcon className="mr-2" />
-          Prev
-        </Button>
-        <h1 className="text-2xl font-bold">{format(currentMonth, 'MMMM yyyy')}</h1>
-        <Button variant="outline" onClick={handleNextMonth}>
-          Next
-          <CalendarIcon className="ml-2" />
-        </Button>
-      </div>
-      <div className="grid grid-cols-7 gap-2">
-        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-          <div key={day} className="text-center font-semibold">
-            {day}
-          </div>
-        ))}
-        {daysInMonth.map(day => (
-          <div key={day.toString()} className={`p-2 ${isSameDay(day, new Date()) ? 'bg-blue-100' : ''}`}>
-            <div className="text-center mb-2">{format(day, 'd')}</div>
-            <Button variant="outline" size="sm" className="w-full mb-2" onClick={() => { setSelectedDate(day); setModalOpen(true) }}>
-              Add Event
-            </Button>
-            {events.filter(event => isSameDay(event.date, day)).map(event => (
-              <div key={event.title} className="flex justify-between items-center bg-gray-100 p-2 rounded mb-1">
-                <div>{event.title}</div>
-                <Button variant="destructive" size="icon" onClick={() => handleDeleteEvent(day, event.title)}>
-                  <X className="w-4 h-4" />
-                </Button>
-              </div>
-            ))}
-          </div>
-        ))}
-      </div>
-      <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-        <DialogTrigger asChild>
-          <Button variant="outline" className="hidden">Open</Button>
-        </DialogTrigger>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Add Event</DialogTitle>
-            <DialogDescription>
-              Add a new event for {selectedDate ? format(selectedDate, 'MMMM d, yyyy') : ''}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="title" className="text-right">
-                Title
-              </Label>
-              <Input id="title" value={eventTitle} onChange={(e) => setEventTitle(e.target.value)} className="col-span-3" />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="description" className="text-right">
-                Description
-              </Label>
-              <Textarea id="description" value={eventDescription} onChange={(e) => setEventDescription(e.target.value)} className="col-span-3" />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleAddEvent} disabled={eventTitle.trim() === ''}>
-              Save
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
-  )
-}
+    saveButton.addEventListener('click', saveEvent);
+    cancelButton.addEventListener('click', resetForm);
+    
+    // Form validation
+    [eventTitleInput, eventTimeInput, eventDescriptionInput].forEach(input => {
+        input.addEventListener('input', validateForm);
+    });
 
-import { Textarea } from "@/components/ui/textarea"
-import { X } from "lucide-react"
+    // Initialize
+    updateCalendar();
+
+    // Calendar Functions
+    function updateCalendar() {
+        const year = currentDate.getFullYear();
+        const month = currentDate.getMonth();
+
+        // Update header
+        monthDisplay.textContent = new Date(year, month).toLocaleString('default', { month: 'long' });
+        yearDisplay.textContent = year;
+
+        // Clear calendar
+        calendar.innerHTML = '';
+
+        // Get first day of month and total days
+        const firstDay = new Date(year, month, 1);
+        const lastDay = new Date(year, month + 1, 0);
+        const startingDay = firstDay.getDay();
+        const totalDays = lastDay.getDate();
+
+        // Get previous month's days that show in current month
+        const prevMonthLastDay = new Date(year, month, 0).getDate();
+        const prevMonthDays = startingDay;
+
+        // Get next month's days that show in current month
+        const nextMonthDays = 42 - (prevMonthDays + totalDays); // 42 is 6 rows * 7 days
+
+        // Render previous month's days
+        for (let i = prevMonthDays - 1; i >= 0; i--) {
+            const dayDiv = createDayElement(prevMonthLastDay - i, true);
+            calendar.appendChild(dayDiv);
+        }
+
+        // Render current month's days
+        for (let i = 1; i <= totalDays; i++) {
+            const dayDiv = createDayElement(i, false);
+            calendar.appendChild(dayDiv);
+        }
+
+        // Render next month's days
+        for (let i = 1; i <= nextMonthDays; i++) {
+            const dayDiv = createDayElement(i, true);
+            calendar.appendChild(dayDiv);
+        }
+
+        updateEventsList();
+    }
+
+    function createDayElement(day, isOtherMonth) {
+        const dayDiv = document.createElement('div');
+        dayDiv.className = 'calendar-day';
+        if (isOtherMonth) dayDiv.classList.add('other-month');
+
+        const date = new Date(
+            currentDate.getFullYear(),
+            isOtherMonth ? (day > 15 ? currentDate.getMonth() - 1 : currentDate.getMonth() + 1) : currentDate.getMonth(),
+            day
+        );
+
+        // Check if it's today
+        const today = new Date();
+        if (date.toDateString() === today.toDateString()) {
+            dayDiv.classList.add('today');
+        }
+
+        // Check if it's selected
+        if (selectedDate && date.toDateString() === selectedDate.toDateString()) {
+            dayDiv.classList.add('selected');
+        }
+
+        // Add day number
+        dayDiv.textContent = day;
+
+        // Add event indicator if events exist for this day
+        const dayEvents = events.filter(event => 
+            new Date(event.date).toDateString() === date.toDateString()
+        );
+        
+        if (dayEvents.length > 0) {
+            const dot = document.createElement('div');
+            dot.className = 'event-dot';
+            dayDiv.appendChild(dot);
+        }
+
+        // Add click handler
+        dayDiv.addEventListener('click', () => selectDate(date));
+
+        return dayDiv;
+    }
+
+    function selectDate(date) {
+        selectedDate = date;
+        resetForm();
+        updateCalendar();
+        showNotification(`Selected ${date.toLocaleDateString()}`);
+    }
+
+    // Event Functions
+    function saveEvent() {
+        if (!selectedDate || !eventTitleInput.value.trim()) {
+            showNotification('Please select a date and enter an event title', true);
+            return;
+        }
+
+        const newEvent = {
+            id: Date.now(),
+            date: selectedDate,
+            title: eventTitleInput.value.trim(),
+            time: eventTimeInput.value,
+            description: eventDescriptionInput.value.trim()
+        };
+
+        events.push(newEvent);
+        saveEvents();
+        updateCalendar();
+        resetForm();
+        showNotification('Event saved successfully');
+    }
+
+    function deleteEvent(eventId) {
+        events = events.filter(event => event.id !== eventId);
+        saveEvents();
+        updateCalendar();
+        showNotification('Event deleted');
+    }
+
+    function updateEventsList() {
+        eventsList.innerHTML = '';
+        const todayEvents = events.filter(event => 
+            new Date(event.date).toDateString() === (selectedDate || new Date()).toDateString()
+        );
+
+        if (todayEvents.length === 0) {
+            eventsList.innerHTML = '<p class="no-events">No events for this day</p>';
+            return;
+        }
+
+        todayEvents
+            .sort((a, b) => a.time.localeCompare(b.time))
+            .forEach(event => {
+                const eventElement = document.createElement('div');
+                eventElement.className = 'event-item';
+                eventElement.innerHTML = `
+                    <div class="event-title">${event.title}</div>
+                    ${event.time ? `<div class="event-time">${formatTime(event.time)}</div>` : ''}
+                    ${event.description ? `<div class="event-description">${event.description}</div>` : ''}
+                    <button class="delete-btn" onclick="deleteEvent(${event.id})">Delete</button>
+                `;
+                eventsList.appendChild(eventElement);
+            });
+    }
+
+    // Utility Functions
+    function validateForm() {
+        const isValid = eventTitleInput.value.trim() !== '';
+        saveButton.disabled = !isValid;
+        saveButton.style.opacity = isValid ? '1' : '0.5';
+    }
+
+    function resetForm() {
+        eventTitleInput.value = '';
+        eventTimeInput.value = '';
+        eventDescriptionInput.value = '';
+        validateForm();
+    }
+
+    function formatTime(time) {
+        return new Date(`2000-01-01T${time}`).toLocaleTimeString([], { 
+            hour: 'numeric', 
+            minute: '2-digit' 
+        });
+    }
+
+    function showNotification(message, isError = false) {
+        notification.textContent = message;
+        notification.className = `notification ${isError ? 'error' : ''} show`;
+        setTimeout(() => {
+            notification.className = 'notification';
+        }, 3000);
+    }
+
+    function loadEvents() {
+        const savedEvents = localStorage.getItem('calendarEvents');
+        return savedEvents ? JSON.parse(savedEvents) : [];
+    }
+
+    function saveEvents() {
+        localStorage.setItem('calendarEvents', JSON.stringify(events));
+    }
+
+    // Make deleteEvent globally available
+    window.deleteEvent = deleteEvent;
+});
